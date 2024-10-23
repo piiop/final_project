@@ -4,8 +4,13 @@
 ![Project Banner](readme_banner.png)
 
 ## 🎨 Overview
-[Brief compelling description of your project - What it does, why it matters, and its core capabilities]
-Bootcamp Final Project
+For our final Bootcamp project, I chose to train a CNN to classify a piece of artwork by it's style, selecting
+from popular art styles and movements. This classifying model is paired with a language model to answer user questions
+and respond with key information about the artistic style. Finally, combining these two models with augmented 
+reality capabilities for real-time overlays. By doing this project, I hope to use the knowledge and tools I've learned during
+this Bootcamp, as well as additional skills and technologies, to build a complete project that could be deployed in
+a real world scenario.
+
 ### Key Features
 - 🖼️ Multi-style art classification using CNN
 - 💡 Intelligent art analysis and interpretation

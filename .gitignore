@@ -163,3 +163,4 @@ cython_debug/
 
 /downloaded_images_aic/
 /downloaded_images_wikiart/
+all_artworks_aic.csv
