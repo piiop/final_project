@@ -285,12 +285,12 @@ class ArtAnalyzer:
         }
 
     
-    def _load_cnn_model(self, model_path: str = "art_classifier_best.keras"):
+    def _load_cnn_model(self, model_path: str = "art_classifier_curated.keras"):
         """
         Load the CNN model from a Keras save file
         
         Args:
-            model_path: Path to the Keras model file, defaults to 'art_classifier_best.keras'
+            model_path: Path to the Keras model file, defaults to 'art_classifier_curated.keras'
         
         Returns:
             Loaded model ready for inference
