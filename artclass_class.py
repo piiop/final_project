@@ -6,10 +6,9 @@ import tensorflow as tf
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import Tuple
 import numpy as np
+import torch 
 
-import tensorflow as tf
 tf.random.set_seed(42)
-import numpy as np
 np.random.seed(42)
 
 
@@ -18,18 +17,27 @@ np.random.seed(42)
 
 
 class ArtAnalyzer:
-    def __init__(self, cnn_model_path: str, style_labels: List[str], llm_model_name: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def __init__(self, cnn_model_path: str, style_labels: List[str]):
         self.cnn_model = self._load_cnn_model(cnn_model_path)
         self.style_labels = style_labels
         
-        # Load LLM and tokenizer
-        self.llm = AutoModelForCausalLM.from_pretrained(llm_model_name)
-        self.tokenizer = AutoTokenizer.from_pretrained(llm_model_name)
+        # TinyLlama initialization
+        model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         
-        # Pre-define question type keyword sets for faster matching
-        self.technique_keywords = {"technique", "style", "painted", "created", "made"}
-        self.historical_keywords = {"history", "period", "when", "era"}
-        self.influence_keywords = {"influence", "impact", "change", "affect"}
+        # Load model 
+        self.llm = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float32  
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        
+        # Set model to eval mode for inference
+        self.llm.eval()
+        
+        # Define keywords for question classification
+        self.technique_keywords = {"technique", "how", "method", "painted", "style", "characteristics"}
+        self.historical_keywords = {"when", "period", "history", "time", "era"}
+        self.influence_keywords = {"influence", "impact", "affect", "inspire"}
         
         self.style_info = {
             "naive_art": {
@@ -334,8 +342,7 @@ class ArtAnalyzer:
         try:
             from tensorflow import keras
             model = keras.models.load_model(model_path, compile=False)
-            print("Model summary:")
-            model.summary()
+            
             return model
         except Exception as e:
             raise Exception(f"Error loading model: {str(e)}")
@@ -347,16 +354,16 @@ class ArtAnalyzer:
             
             # Convert to numpy for the debug prints
             image_np = image.numpy()
-            print("Image shape before prediction:", image_np.shape)
-            print("Image value range:", image_np.min(), "to", image_np.max())
+            # print("Image shape before prediction:", image_np.shape)
+            # print("Image value range:", image_np.min(), "to", image_np.max())
                     
             # Get predictions
             probabilities = self.cnn_model.predict(image, verbose=0)[0]
             
             
-            print("\nDetailed prediction mapping:")
-            for i, (style, prob) in enumerate(zip(self.style_labels, probabilities)):
-                print(f"Index {i:2d}: {style:20s} = {prob:.4f}")
+            # print("\nDetailed prediction mapping:")
+            # for i, (style, prob) in enumerate(zip(self.style_labels, probabilities)):
+            #     print(f"Index {i:2d}: {style:20s} = {prob:.4f}")
             
             # Create dictionary of style predictions
             result = {
@@ -369,41 +376,33 @@ class ArtAnalyzer:
         except Exception as e:
             print(f"Analysis error: {str(e)}")
             raise Exception(f"Error during image analysis: {str(e)}")
+      
+    def _clean_response(self, response: str, prompt: str) -> str:
+        """Clean up the model response"""
+        # Remove the prompt from the response
+        response = response.replace(prompt, "")
         
-    def clean_response(response: str) -> str:
-        """Clean up LLM response by removing prompt artifacts and extra whitespace"""
-        
-        # Split on known markers and take the relevant part
-        if "Answer:" in response:
-            response = response.split("Answer:", 1)[1]
-        
-        # Remove any trailing prompt parts
-        markers_to_remove = [
-            "Question:",
-            "Context about the artwork:",
-            "Please provide a detailed",
-            "Focus on being accurate"
-        ]
-        for marker in markers_to_remove:
-            if marker in response:
-                response = response.split(marker, 1)[0]
+        # Remove any system/user/assistant markers
+        markers = ["<|system|>", "<|user|>", "<|assistant|>"]
+        for marker in markers:
+            response = response.replace(marker, "")
         
         # Clean up whitespace
         response = response.strip()
-        response = ' '.join(response.split())  # Replace multiple spaces with single space
+        response = " ".join(response.split())
         
-        return response    
+        return response
             
     def generate_response_with_context(self, question: str, style_predictions: Dict[str, float]) -> Tuple[str, str]:
-        """Combined question classification and context generation"""
+        """Generate context based on question type and style predictions"""
         question_lower = question.lower()
         
-        # Determine type and get top styles in one pass
+        # Get top styles
         top_styles = sorted(style_predictions.items(), key=lambda x: x[1], reverse=True)[:2]
         primary_style = top_styles[0][0].lower().replace(" ", "_")
         style_info = self.style_info.get(primary_style, {})
         
-        # Determine context type using sets
+        # Determine question type
         if any(keyword in question_lower for keyword in self.technique_keywords):
             question_type = "technique"
         elif any(keyword in question_lower for keyword in self.historical_keywords):
@@ -413,59 +412,68 @@ class ArtAnalyzer:
         else:
             question_type = "general"
             
-        # Use your existing context templates
+        # Format context based on question type
         context_templates = {
-            "technique": f"""
-                The artwork shows characteristics of {primary_style} ({top_styles[0][1]:.1%} confidence).
-                Key techniques in {primary_style} include: {', '.join(style_info.get('techniques', []))}
-                Common characteristics: {', '.join(style_info.get('characteristics', []))}
-            """,
-            "historical": f"""
-                This style emerged in {style_info.get('period', 'unknown period')}.
-                Historical context: {style_info.get('historical_context', '')}
-                Notable artists: {', '.join(style_info.get('notable_artists', []))}
-                Key works: {', '.join(style_info.get('key_works', []))}
-            """,
-            "influence": f"""
-                {style_info.get('influence', '')}
-                Impact on art history: {style_info.get('impact', '')}
-                This style influenced: {', '.join(style_info.get('influenced', []))}
-            """,
-            "general": f"""
-                The artwork primarily shows {primary_style} characteristics ({top_styles[0][1]:.1%} confidence).
-                Secondary style influence: {top_styles[1][0]} ({top_styles[1][1]:.1%} confidence).
-                Period: {style_info.get('period', '')}
-                Key characteristics: {', '.join(style_info.get('characteristics', []))}
-            """
-        }
+                "technique": f"""Style: {primary_style} ({top_styles[0][1]:.1%} confidence)
+            Characteristics: {', '.join(style_info.get('characteristics', []))}""",
+                
+                "historical": f"""Period: {style_info.get('period', 'unknown period')}
+            Notable artists: {', '.join(style_info.get('notable_artists', []))}
+            Key works: {', '.join(style_info.get('key_works', []))}""",
+                
+                "influence": f"""Style: {primary_style}
+            Notable artists: {', '.join(style_info.get('notable_artists', []))}
+            Key characteristics: {', '.join(style_info.get('characteristics', []))}""",
+                
+                "general": f"""Primary style: {primary_style} ({top_styles[0][1]:.1%} confidence)
+            Secondary style: {top_styles[1][0]} ({top_styles[1][1]:.1%} confidence)
+            Period: {style_info.get('period', '')}
+            Key characteristics: {', '.join(style_info.get('characteristics', []))}"""
+            }
         
         return context_templates[question_type], question_type
 
     def answer_question(self, question: str, style_predictions: Dict[str, float]) -> str:
-        """Generate a response using TinyLlama with optimized parameters"""
+        """Generate response using TinyLlama"""
+        # Get context and format prompt
         context, _ = self.generate_response_with_context(question, style_predictions)
         
-        prompt = f"""
-        Context about the artwork: {context}
-        
+        # Format prompt for TinyLlama
+        prompt = f"""<|system|>
+        You are an art history expert. Provide a concise, accurate response.
+
+        <|user|>
+        Context: {context}
         Question: {question}
+
+        <|assistant|>"""
         
-        Please provide a detailed but concise answer based on the context provided.
-        Focus on being accurate and informative while maintaining a conversational tone. Keep your response
-        to less than 400 characters.
-        
-        Answer:"""
-        
-        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True)
-        outputs = self.llm.generate(
-            **inputs,
-            max_length=400,
-            temperature=0.7,
-            top_p=0.9,
-            do_sample=True
+        # Tokenize with proper handling
+        inputs = self.tokenizer(
+            prompt,
+            return_tensors="pt",
+            truncation=True,
+            max_length=200
         )
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
-        return self.clean_response(response)
+        # Generate response
+        with torch.inference_mode():
+            outputs = self.llm.generate(
+                **inputs,
+                max_length=200,
+                temperature=0.3,
+                top_p=0.9,
+                do_sample=True,
+                repetition_penalty=1.1,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+            )
+        
+        # Decode and clean response
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        response = self._clean_response(response, prompt)
+        
+        return response
+    
 
 
