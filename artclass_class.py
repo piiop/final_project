@@ -416,27 +416,7 @@ class ArtAnalyzer:
         for phrase in artwork_phrases:
             if phrase in response.lower():
                 response = response.replace(phrase, "appears to be in the style of")
-        
-        # Remove specific artwork titles
-        famous_artworks = [
-            "The Persistence of Memory",
-            "The Starry Night",
-            "Campbell's Soup Cans",
-            "Whaam!",
-            "Girl with a Pearl Earring"
-        ]
-        for artwork in famous_artworks:
-            if artwork in response:
-                response = response.split(artwork)[0].strip()
-                response += " This work appears to be in the style of"
-                # Get everything after the artwork title
-                remaining = response.split(artwork)[1]
-                # Keep any artist names that come after
-                if "by" in remaining:
-                    artist = remaining.split("by")[1].strip().split(".")[0]
-                    response += f" {artist}."
-                else:
-                    response += "."
+
         
         # Clean up whitespace and formatting
         response = response.strip()
@@ -519,8 +499,8 @@ class ArtAnalyzer:
         full_prompt = f"{system_message}\n{user_prompt}"
         
         # Debug: Print token count for monitoring
-        token_count = len(self.tokenizer.encode(full_prompt))
-        print(f"Prompt token count: {token_count}")
+        # token_count = len(self.tokenizer.encode(full_prompt))
+        # print(f"Prompt token count: {token_count}")
         
         # Tokenize with proper handling
         inputs = self.tokenizer(
