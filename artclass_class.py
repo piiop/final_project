@@ -4,6 +4,15 @@ from typing import Dict, List, Optional
 import json
 import tensorflow as tf
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from typing import Tuple
+import numpy as np
+
+import tensorflow as tf
+tf.random.set_seed(42)
+import numpy as np
+np.random.seed(42)
+
+
 
 # %%
 
@@ -17,50 +26,22 @@ class ArtAnalyzer:
         self.llm = AutoModelForCausalLM.from_pretrained(llm_model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(llm_model_name)
         
+        # Pre-define question type keyword sets for faster matching
+        self.technique_keywords = {"technique", "style", "painted", "created", "made"}
+        self.historical_keywords = {"history", "period", "when", "era"}
+        self.influence_keywords = {"influence", "impact", "change", "affect"}
+        
         self.style_info = {
-            "abstract_expressionism": {
-                "period": "1940s-1950s",
+            "naive_art": {
+                "period": "19th-20th century",
                 "characteristics": [
-                    "Spontaneous, improvisational work",
-                    "Large-scale canvases",
-                    "Emotional intensity",
-                    "Non-representational forms"
+                    "Childlike simplicity",
+                    "Bright colors",
+                    "Lack of formal perspective",
+                    "Intuitive approach to composition"
                 ],
-                "notable_artists": ["Jackson Pollock", "Willem de Kooning", "Mark Rothko"],
-                "key_works": ["No. 5, 1948", "Woman I"]
-            },
-            "conceptual_art": {
-                "period": "1960s-present",
-                "characteristics": [
-                    "Emphasis on ideas over visual forms",
-                    "Documentation and language-based work",
-                    "Questioning of traditional art",
-                    "Often installation-based"
-                ],
-                "notable_artists": ["Joseph Kosuth", "Sol LeWitt", "Marina Abramović"],
-                "key_works": ["One and Three Chairs", "Wall Drawing Series"]
-            },
-            "early_renaissance": {
-                "period": "14th-15th century",
-                "characteristics": [
-                    "Linear perspective",
-                    "Naturalistic representation",
-                    "Religious themes",
-                    "Tempera painting"
-                ],
-                "notable_artists": ["Masaccio", "Fra Angelico", "Botticelli"],
-                "key_works": ["The Tribute Money", "Primavera"]
-            },
-            "expressionism": {
-                "period": "Early 20th century",
-                "characteristics": [
-                    "Emotional intensity",
-                    "Distorted forms",
-                    "Bold colors",
-                    "Subjective perspective"
-                ],
-                "notable_artists": ["Edvard Munch", "Ernst Ludwig Kirchner", "Emil Nolde"],
-                "key_works": ["The Scream", "Berlin Street Scene"]
+                "notable_artists": ["Henri Rousseau", "Grandma Moses", "Niko Pirosmani"],
+                "key_works": ["The Sleeping Gypsy", "The Dream"]
             },
             "baroque": {
                 "period": "17th century",
@@ -73,93 +54,71 @@ class ArtAnalyzer:
                 "notable_artists": ["Caravaggio", "Rembrandt", "Peter Paul Rubens"],
                 "key_works": ["The Night Watch", "The Conversion of Saint Paul"]
             },
-            "cubism": {
-                "period": "1907-1920s",
+            "rococo": {
+                "period": "18th century",
                 "characteristics": [
-                    "Geometric shapes",
-                    "Multiple perspectives simultaneously",
-                    "Fragmented forms",
-                    "Monochromatic or limited color palette"
+                    "Ornate decoration",
+                    "Light colors",
+                    "Asymmetrical designs",
+                    "Playful themes"
                 ],
-                "notable_artists": ["Pablo Picasso", "Georges Braque", "Juan Gris"],
-                "key_works": ["Les Demoiselles d'Avignon", "Portrait of Daniel-Henry Kahnweiler"]
+                "notable_artists": ["Jean-Honoré Fragonard", "François Boucher", "Antoine Watteau"],
+                "key_works": ["The Swing", "Pilgrimage to Cythera"]
             },
-            "contemporary_realism": {
-                "period": "1960s-present",
+            "romanticism": {
+                "period": "Late 18th-mid 19th century",
                 "characteristics": [
-                    "Photographic accuracy",
-                    "Modern subjects",
-                    "Technical precision",
-                    "Everyday scenes"
+                    "Emphasis on emotion and nature",
+                    "Dramatic landscapes",
+                    "Historical subjects",
+                    "Individual expression"
                 ],
-                "notable_artists": ["Richard Estes", "Chuck Close", "Antonio López García"],
-                "key_works": ["Telephone Booths", "Big Self-Portrait"]
+                "notable_artists": ["Eugène Delacroix", "J.M.W. Turner", "Caspar David Friedrich"],
+                "key_works": ["Liberty Leading the People", "The Wanderer above the Sea of Fog"]
             },
-            "art_informel": {
-                "period": "1940s-1950s",
+            "art_deco": {
+                "period": "1920s-1930s",
                 "characteristics": [
-                    "Spontaneous gestural painting",
-                    "Abstract compositions",
-                    "Emphasis on material qualities",
-                    "Rejection of geometric abstraction"
+                    "Geometric patterns",
+                    "Luxurious materials",
+                    "Streamlined forms",
+                    "Bold colors and symmetry"
                 ],
-                "notable_artists": ["Jean Dubuffet", "Antoni Tàpies", "Jean Fautrier"],
-                "key_works": ["Corps de dame", "Matter Painting"]
+                "notable_artists": ["Tamara de Lempicka", "René Lalique", "Erté"],
+                "key_works": ["Young Lady with Gloves", "The Wisdom of Athena"]
             },
-            "contemporary": {
-                "period": "1970s-present",
+            "american_realism": {
+                "period": "Mid 19th-early 20th century",
                 "characteristics": [
-                    "Diverse mediums and approaches",
-                    "Global perspective",
-                    "Social and political themes",
-                    "Digital and new media"
-                ],
-                "notable_artists": ["Ai Weiwei", "Jeff Koons", "Damien Hirst"],
-                "key_works": ["Sunflower Seeds", "Balloon Dog"]
-            },
-            "realism": {
-                "period": "Mid-19th century",
-                "characteristics": [
-                    "Accurate depiction",
-                    "Contemporary subjects",
+                    "Depiction of everyday life",
+                    "Urban scenes",
                     "Social commentary",
-                    "Unidealized scenes"
+                    "Precise detail"
                 ],
-                "notable_artists": ["Gustave Courbet", "Jean-François Millet", "Honoré Daumier"],
-                "key_works": ["The Stone Breakers", "The Gleaners"]
+                "notable_artists": ["Edward Hopper", "Thomas Eakins", "Winslow Homer"],
+                "key_works": ["Nighthawks", "The Gross Clinic"]
             },
-            "neo_romantic": {
-                "period": "1930s-1950s",
+            "art_nouveau": {
+                "period": "1890-1910",
                 "characteristics": [
-                    "Emotional landscapes",
-                    "Mystical elements",
-                    "Nature focus",
-                    "Poetic interpretation"
+                    "Organic, flowing lines",
+                    "Nature-inspired forms",
+                    "Decorative patterns",
+                    "Integration of form and structure"
                 ],
-                "notable_artists": ["Graham Sutherland", "Paul Nash", "John Piper"],
-                "key_works": ["Entrance to a Lane", "Totes Meer"]
+                "notable_artists": ["Alphonse Mucha", "Gustav Klimt", "Henri de Toulouse-Lautrec"],
+                "key_works": ["The Four Seasons", "Gismonda"]
             },
-            "post_impressionism": {
-                "period": "1886-1905",
+            "expressionism": {
+                "period": "Early 20th century",
                 "characteristics": [
+                    "Emotional intensity",
+                    "Distorted forms",
                     "Bold colors",
-                    "Symbolic elements",
-                    "Geometric forms",
-                    "Emotional intensity"
+                    "Subjective perspective"
                 ],
-                "notable_artists": ["Vincent van Gogh", "Paul Gauguin", "Paul Cézanne"],
-                "key_works": ["The Starry Night", "The Card Players"]
-            },
-            "modern_art": {
-                "period": "Late 19th-Mid 20th century",
-                "characteristics": [
-                    "Break from traditional techniques",
-                    "Experimentation with form",
-                    "New artistic perspectives",
-                    "Emphasis on innovation"
-                ],
-                "notable_artists": ["Henri Matisse", "Marcel Duchamp", "Wassily Kandinsky"],
-                "key_works": ["The Red Studio", "Fountain"]
+                "notable_artists": ["Edvard Munch", "Ernst Ludwig Kirchner", "Emil Nolde"],
+                "key_works": ["The Scream", "Berlin Street Scene"]
             },
             "modernism": {
                 "period": "Late 19th-mid 20th century",
@@ -172,93 +131,27 @@ class ArtAnalyzer:
                 "notable_artists": ["Piet Mondrian", "Constantin Brancusi", "Georgia O'Keeffe"],
                 "key_works": ["Broadway Boogie Woogie", "Bird in Space"]
             },
-            "surrealism": {
-                "period": "1924-1950s",
+            "post_impressionism": {
+                "period": "1886-1905",
                 "characteristics": [
-                    "Dream-like scenes",
-                    "Juxtaposed elements",
-                    "Unconscious imagery",
-                    "Psychological themes"
-                ],
-                "notable_artists": ["Salvador Dalí", "René Magritte", "Max Ernst"],
-                "key_works": ["The Persistence of Memory", "The Son of Man"]
-            },
-            "symbolism": {
-                "period": "1886-1910",
-                "characteristics": [
-                    "Mystical themes",
-                    "Personal mythology",
-                    "Dream imagery",
-                    "Spiritual content"
-                ],
-                "notable_artists": ["Gustav Klimt", "Odilon Redon", "Gustave Moreau"],
-                "key_works": ["The Kiss", "The Cyclops"]
-            },
-            "rococo": {
-                "period": "18th century",
-                "characteristics": [
-                    "Ornate decoration",
-                    "Light colors",
-                    "Asymmetrical designs",
-                    "Playful themes"
-                ],
-                "notable_artists": ["Jean-Honoré Fragonard", "François Boucher", "Antoine Watteau"],
-                "key_works": ["The Swing", "Pilgrimage to Cythera"]
-            },
-            "northern_renaissance": {
-                "period": "15th-16th century",
-                "characteristics": [
-                    "Oil painting technique",
-                    "Minute detail",
-                    "Symbolic realism",
-                    "Domestic scenes"
-                ],
-                "notable_artists": ["Jan van Eyck", "Albrecht Dürer", "Hieronymus Bosch"],
-                "key_works": ["Arnolfini Portrait", "The Garden of Earthly Delights"]
-            },
-            "pop_art": {
-                "period": "1950s-1970s",
-                "characteristics": [
-                    "Use of commercial imagery",
                     "Bold colors",
-                    "Mass culture references",
-                    "Reproduction techniques"
+                    "Symbolic elements",
+                    "Geometric forms",
+                    "Emotional intensity"
                 ],
-                "notable_artists": ["Andy Warhol", "Roy Lichtenstein", "Claes Oldenburg"],
-                "key_works": ["Campbell's Soup Cans", "Whaam!"]
+                "notable_artists": ["Vincent van Gogh", "Paul Gauguin", "Paul Cézanne"],
+                "key_works": ["The Starry Night", "The Card Players"]
             },
-            "mannerism": {
-                "period": "16th century",
+            "impressionism": {
+                "period": "1860s-1880s",
                 "characteristics": [
-                    "Elongated figures",
-                    "Complex poses",
-                    "Artificial colors",
-                    "Technical sophistication"
+                    "Visible brushstrokes",
+                    "Light and color emphasis",
+                    "Outdoor painting",
+                    "Capture of momentary effects"
                 ],
-                "notable_artists": ["Parmigianino", "El Greco", "Bronzino"],
-                "key_works": ["Madonna with the Long Neck", "The Burial of Count Orgaz"]
-            },
-            "late_renaissance": {
-                "period": "Early-mid 16th century",
-                "characteristics": [
-                    "Increased complexity",
-                    "Harmonious composition",
-                    "Rich coloring",
-                    "Advanced perspective"
-                ],
-                "notable_artists": ["Raphael", "Titian", "Tintoretto"],
-                "key_works": ["School of Athens", "Assumption of the Virgin"]
-            },
-            "ukiyo_e": {
-                "period": "17th-19th century",
-                "characteristics": [
-                    "Japanese woodblock prints",
-                    "Flat perspective",
-                    "Bold colors",
-                    "Scenes of daily life and landscape"
-                ],
-                "notable_artists": ["Hokusai", "Hiroshige", "Utamaro"],
-                "key_works": ["The Great Wave off Kanagawa", "53 Stations of the Tōkaidō"]
+                "notable_artists": ["Claude Monet", "Pierre-Auguste Renoir", "Edgar Degas"],
+                "key_works": ["Impression, Sunrise", "Water Lilies"]
             },
             "high_renaissance": {
                 "period": "1490-1527",
@@ -271,6 +164,138 @@ class ArtAnalyzer:
                 "notable_artists": ["Leonardo da Vinci", "Michelangelo", "Raphael"],
                 "key_works": ["Mona Lisa", "The Last Supper"]
             },
+            "cubism": {
+                "period": "1907-1920s",
+                "characteristics": [
+                    "Geometric shapes",
+                    "Multiple perspectives simultaneously",
+                    "Fragmented forms",
+                    "Monochromatic or limited color palette"
+                ],
+                "notable_artists": ["Pablo Picasso", "Georges Braque", "Juan Gris"],
+                "key_works": ["Les Demoiselles d'Avignon", "Portrait of Daniel-Henry Kahnweiler"]
+            },
+            "surrealism": {
+                "period": "1924-1950s",
+                "characteristics": [
+                    "Dream-like scenes",
+                    "Juxtaposed elements",
+                    "Unconscious imagery",
+                    "Psychological themes"
+                ],
+                "notable_artists": ["Salvador Dalí", "René Magritte", "Max Ernst"],
+                "key_works": ["The Persistence of Memory", "The Son of Man"]
+            },
+            "abstract_expressionism": {
+                "period": "1940s-1950s",
+                "characteristics": [
+                    "Spontaneous, improvisational work",
+                    "Large-scale canvases",
+                    "Emotional intensity",
+                    "Non-representational forms"
+                ],
+                "notable_artists": ["Jackson Pollock", "Willem de Kooning", "Mark Rothko"],
+                "key_works": ["No. 5, 1948", "Woman I"]
+            },
+            "art_informel": {
+                "period": "1940s-1950s",
+                "characteristics": [
+                    "Spontaneous gestural painting",
+                    "Abstract compositions",
+                    "Emphasis on material qualities",
+                    "Rejection of geometric abstraction"
+                ],
+                "notable_artists": ["Jean Dubuffet", "Antoni Tàpies", "Jean Fautrier"],
+                "key_works": ["Corps de dame", "Matter Painting"]
+            },
+            "mannerism": {
+                "period": "16th century",
+                "characteristics": [
+                    "Elongated figures",
+                    "Complex poses",
+                    "Artificial colors",
+                    "Technical sophistication"
+                ],
+                "notable_artists": ["Parmigianino", "El Greco", "Bronzino"],
+                "key_works": ["Madonna with the Long Neck", "The Burial of Count Orgaz"]
+            },
+            "northern_renaissance": {
+                "period": "15th-16th century",
+                "characteristics": [
+                    "Oil painting technique",
+                    "Minute detail",
+                    "Symbolic realism",
+                    "Domestic scenes"
+                ],
+                "notable_artists": ["Jan van Eyck", "Albrecht Dürer", "Hieronymus Bosch"],
+                "key_works": ["Arnolfini Portrait", "The Garden of Earthly Delights"]
+            },
+            "symbolism": {
+                "period": "1886-1910",
+                "characteristics": [
+                    "Mystical themes",
+                    "Personal mythology",
+                    "Dream imagery",
+                    "Spiritual content"
+                ],
+                "notable_artists": ["Gustav Klimt", "Odilon Redon", "Gustave Moreau"],
+                "key_works": ["The Kiss", "The Cyclops"]
+            },
+            "early_renaissance": {
+                "period": "14th-15th century",
+                "characteristics": [
+                    "Linear perspective",
+                    "Naturalistic representation",
+                    "Religious themes",
+                    "Tempera painting"
+                ],
+                "notable_artists": ["Masaccio", "Fra Angelico", "Botticelli"],
+                "key_works": ["The Tribute Money", "Primavera"]
+            },
+            "minimalism": {
+                "period": "1960s-1970s",
+                "characteristics": [
+                    "Geometric abstraction",
+                    "Simplicity of form",
+                    "Industrial materials",
+                    "Repetitive elements"
+                ],
+                "notable_artists": ["Donald Judd", "Dan Flavin", "Frank Stella"],
+                "key_works": ["Untitled (Stack)", "The Marriage of Reason and Squalor, II"]
+            },
+            "neo_romantic": {
+                "period": "1930s-1950s",
+                "characteristics": [
+                    "Emotional landscapes",
+                    "Mystical elements",
+                    "Nature focus",
+                    "Poetic interpretation"
+                ],
+                "notable_artists": ["Graham Sutherland", "Paul Nash", "John Piper"],
+                "key_works": ["Entrance to a Lane", "Totes Meer"]
+            },
+            "ukiyo_e": {
+                "period": "17th-19th century",
+                "characteristics": [
+                    "Japanese woodblock prints",
+                    "Flat perspective",
+                    "Bold colors",
+                    "Scenes of daily life and landscape"
+                ],
+                "notable_artists": ["Hokusai", "Hiroshige", "Utamaro"],
+                "key_works": ["The Great Wave off Kanagawa", "53 Stations of the Tōkaidō"]
+            },
+            "pop_art": {
+                "period": "1950s-1970s",
+                "characteristics": [
+                    "Use of commercial imagery",
+                    "Bold colors",
+                    "Mass culture references",
+                    "Reproduction techniques"
+                ],
+                "notable_artists": ["Andy Warhol", "Roy Lichtenstein", "Claes Oldenburg"],
+                "key_works": ["Campbell's Soup Cans", "Whaam!"]
+            },
             "fauvism": {
                 "period": "1904-1908",
                 "characteristics": [
@@ -281,6 +306,17 @@ class ArtAnalyzer:
                 ],
                 "notable_artists": ["Henri Matisse", "André Derain", "Maurice de Vlaminck"],
                 "key_works": ["The Green Stripe", "The Dance"]
+            },
+            "neoclassicism": {
+                "period": "1750s-1850s",
+                "characteristics": [
+                    "Classical revival",
+                    "Rational compositions",
+                    "Historical themes",
+                    "Clear drawing and modeling"
+                ],
+                "notable_artists": ["Jacques-Louis David", "Jean-Auguste-Dominique Ingres", "Antonio Canova"],
+                "key_works": ["Oath of the Horatii", "Napoleon Crossing the Alps"]
             }
         }
 
@@ -298,59 +334,86 @@ class ArtAnalyzer:
         try:
             from tensorflow import keras
             model = keras.models.load_model(model_path, compile=False)
+            print("Model summary:")
+            model.summary()
             return model
-        except FileNotFoundError:
-            raise Exception(f"Model file not found at: {model_path}")
         except Exception as e:
             raise Exception(f"Error loading model: {str(e)}")
     
     def analyze_image(self, image) -> Dict[str, float]:
-        """
-        Get style predictions from CNN model
-        
-        Args:
-            image: Image tensor prepared for CNN (should be preprocessed)
-                Expected shape: (1, height, width, channels)
-        
-        Returns:
-            Dictionary mapping style names to prediction probabilities
-        """
         try:
-            # Add batch dimension if not present
             if len(image.shape) == 3:
                 image = tf.expand_dims(image, 0)
-                
-            # Get predictions
-            predictions = self.cnn_model.predict(image, verbose=0)
             
-            # Apply softmax to get probabilities
-            probabilities = tf.nn.softmax(predictions)[0]
+            # Convert to numpy for the debug prints
+            image_np = image.numpy()
+            print("Image shape before prediction:", image_np.shape)
+            print("Image value range:", image_np.min(), "to", image_np.max())
+                    
+            # Get predictions
+            probabilities = self.cnn_model.predict(image, verbose=0)[0]
+            
+            
+            print("\nDetailed prediction mapping:")
+            for i, (style, prob) in enumerate(zip(self.style_labels, probabilities)):
+                print(f"Index {i:2d}: {style:20s} = {prob:.4f}")
             
             # Create dictionary of style predictions
-            return {
+            result = {
                 self.style_labels[i]: float(prob)
                 for i, prob in enumerate(probabilities)
             }
             
+            return result
+                
         except Exception as e:
+            print(f"Analysis error: {str(e)}")
             raise Exception(f"Error during image analysis: {str(e)}")
         
-    def get_style_information(self, style_name: str) -> Optional[Dict]:
-        """Get detailed information about an art style"""
-        # Convert style name to match dictionary keys
-        style_key = style_name.lower().replace(" ", "_")
-        return self.style_info.get(style_key)
-    def generate_llm_context(self, style_predictions: Dict[str, float], question_type: str) -> str:
-        """
-        Generate relevant context for the LLM based on the question type and style predictions
-        """
-        # Get top 2 predicted styles
+    def clean_response(response: str) -> str:
+        """Clean up LLM response by removing prompt artifacts and extra whitespace"""
+        
+        # Split on known markers and take the relevant part
+        if "Answer:" in response:
+            response = response.split("Answer:", 1)[1]
+        
+        # Remove any trailing prompt parts
+        markers_to_remove = [
+            "Question:",
+            "Context about the artwork:",
+            "Please provide a detailed",
+            "Focus on being accurate"
+        ]
+        for marker in markers_to_remove:
+            if marker in response:
+                response = response.split(marker, 1)[0]
+        
+        # Clean up whitespace
+        response = response.strip()
+        response = ' '.join(response.split())  # Replace multiple spaces with single space
+        
+        return response    
+            
+    def generate_response_with_context(self, question: str, style_predictions: Dict[str, float]) -> Tuple[str, str]:
+        """Combined question classification and context generation"""
+        question_lower = question.lower()
+        
+        # Determine type and get top styles in one pass
         top_styles = sorted(style_predictions.items(), key=lambda x: x[1], reverse=True)[:2]
         primary_style = top_styles[0][0].lower().replace(" ", "_")
-        
         style_info = self.style_info.get(primary_style, {})
         
-        # Create different context templates based on question type
+        # Determine context type using sets
+        if any(keyword in question_lower for keyword in self.technique_keywords):
+            question_type = "technique"
+        elif any(keyword in question_lower for keyword in self.historical_keywords):
+            question_type = "historical"
+        elif any(keyword in question_lower for keyword in self.influence_keywords):
+            question_type = "influence"
+        else:
+            question_type = "general"
+            
+        # Use your existing context templates
         context_templates = {
             "technique": f"""
                 The artwork shows characteristics of {primary_style} ({top_styles[0][1]:.1%} confidence).
@@ -376,46 +439,33 @@ class ArtAnalyzer:
             """
         }
         
-        return context_templates.get(question_type, context_templates["general"])    
-    def classify_question(self, question: str) -> str:
-        """
-        Determine the type of question being asked to generate appropriate context
-        """
-        question = question.lower()
-        if any(word in question for word in ["technique", "style", "painted", "created", "made"]):
-            return "technique"
-        elif any(word in question for word in ["history", "period", "when", "era"]):
-            return "historical"
-        elif any(word in question for word in ["influence", "impact", "change", "affect"]):
-            return "influence"
-        return "general"
+        return context_templates[question_type], question_type
 
     def answer_question(self, question: str, style_predictions: Dict[str, float]) -> str:
-        """
-        Generate a response using Llama2 with appropriate context from style_info
-        """
-        # Determine question type
-        question_type = self.classify_question(question)
+        """Generate a response using TinyLlama with optimized parameters"""
+        context, _ = self.generate_response_with_context(question, style_predictions)
         
-        # Generate appropriate context
-        context = self.generate_llm_context(style_predictions, question_type)
-        
-        # Create prompt for LLM
         prompt = f"""
         Context about the artwork: {context}
         
         Question: {question}
         
         Please provide a detailed but concise answer based on the context provided.
-        Focus on being accurate and informative while maintaining a conversational tone.
+        Focus on being accurate and informative while maintaining a conversational tone. Keep your response
+        to less than 400 characters.
         
         Answer:"""
         
-        # Generate response using LLM
         inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True)
-        outputs = self.llm.generate(**inputs, max_length=200)
+        outputs = self.llm.generate(
+            **inputs,
+            max_length=400,
+            temperature=0.7,
+            top_p=0.9,
+            do_sample=True
+        )
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
-        return response
+        return self.clean_response(response)
 
 
