@@ -377,17 +377,68 @@ class ArtAnalyzer:
             print(f"Analysis error: {str(e)}")
             raise Exception(f"Error during image analysis: {str(e)}")
       
-    def _clean_response(self, response: str, prompt: str) -> str:
-        """Clean up the model response"""
-        # Remove the prompt from the response
+    def _clean_response(self, response: str, prompt: str, system_message: str) -> str:
+        """Clean up the model response with enhanced filtering"""
+        # Remove the prompt and system message from the response
         response = response.replace(prompt, "")
+        response = response.replace(system_message, "")
         
         # Remove any system/user/assistant markers
-        markers = ["<|system|>", "<|user|>", "<|assistant|>"]
+        markers = ["<|system|>", "<|user|>", "<|assistant|>", "Rules:", "Complete Response:"]
         for marker in markers:
             response = response.replace(marker, "")
         
-        # Clean up whitespace
+        # Remove style prediction prefixes and metadata
+        prefixes_to_remove = [
+            "Primary Predicted Style:",
+            "Complete Response:",
+            "Answer:",
+            "Style:",
+            "Primary Style:",
+            "Here is a possible answer for this question:"
+        ]
+        for prefix in prefixes_to_remove:
+            response = response.replace(prefix, "")
+        
+        # Remove cases where the model outputs the rules
+        if "1." in response and "2." in response and "provide a complete response" in response.lower():
+            response = response.split("1.")[0].strip()
+        
+        # Replace definitive artwork attributions with style-based language
+        artwork_phrases = [
+            "was painted by",
+            "was created by",
+            "is by",
+            "was made by",
+            "painted this",
+            "created this"
+        ]
+        for phrase in artwork_phrases:
+            if phrase in response.lower():
+                response = response.replace(phrase, "appears to be in the style of")
+        
+        # Remove specific artwork titles
+        famous_artworks = [
+            "The Persistence of Memory",
+            "The Starry Night",
+            "Campbell's Soup Cans",
+            "Whaam!",
+            "Girl with a Pearl Earring"
+        ]
+        for artwork in famous_artworks:
+            if artwork in response:
+                response = response.split(artwork)[0].strip()
+                response += " This work appears to be in the style of"
+                # Get everything after the artwork title
+                remaining = response.split(artwork)[1]
+                # Keep any artist names that come after
+                if "by" in remaining:
+                    artist = remaining.split("by")[1].strip().split(".")[0]
+                    response += f" {artist}."
+                else:
+                    response += "."
+        
+        # Clean up whitespace and formatting
         response = response.strip()
         response = " ".join(response.split())
         
@@ -414,66 +465,88 @@ class ArtAnalyzer:
             
         # Format context based on question type
         context_templates = {
-                "technique": f"""Style: {primary_style} ({top_styles[0][1]:.1%} confidence)
-            Characteristics: {', '.join(style_info.get('characteristics', []))}""",
+            "technique": f"""Style: {primary_style}
+                Visual Elements: {', '.join(style_info.get('characteristics', []))}
+                Cultural Impact: This style emerged in {style_info.get('period', '')} and transformed art by introducing new approaches to representation
+                Key Examples: {', '.join(style_info.get('key_works', []))}""",
                 
-                "historical": f"""Period: {style_info.get('period', 'unknown period')}
-            Notable artists: {', '.join(style_info.get('notable_artists', []))}
-            Key works: {', '.join(style_info.get('key_works', []))}""",
+            "historical": f"""Period: {style_info.get('period', 'unknown period')}
+                Key artists: {', '.join(style_info.get('notable_artists', []))}
+                Development: Started in {style_info.get('period', '')}, focusing on {', '.join(style_info.get('characteristics', []))}
+                Notable works: {', '.join(style_info.get('key_works', []))}""",
                 
-                "influence": f"""Style: {primary_style}
-            Notable artists: {', '.join(style_info.get('notable_artists', []))}
-            Key characteristics: {', '.join(style_info.get('characteristics', []))}""",
+            "influence": f"""Primary style: {primary_style}
+                Period: {style_info.get('period', '')}
+                Major artists and contributions: {', '.join(style_info.get('notable_artists', []))}
+                Cultural context: This movement focused on {', '.join(style_info.get('characteristics', []))}
+                Key works: {', '.join(style_info.get('key_works', []))}""",
                 
-                "general": f"""Primary style: {primary_style} ({top_styles[0][1]:.1%} confidence)
-            Secondary style: {top_styles[1][0]} ({top_styles[1][1]:.1%} confidence)
-            Period: {style_info.get('period', '')}
-            Key characteristics: {', '.join(style_info.get('characteristics', []))}"""
-            }
-        
+            "general": f"""Primary style: {primary_style} ({top_styles[0][1]:.1%} confidence)
+                Period: {style_info.get('period', '')}
+                Notable artists: {', '.join(style_info.get('notable_artists', []))}
+                Characteristics: {', '.join(style_info.get('characteristics', []))}
+                Key works: {', '.join(style_info.get('key_works', []))}"""
+        }
+    
         return context_templates[question_type], question_type
 
     def answer_question(self, question: str, style_predictions: Dict[str, float]) -> str:
-        """Generate response using TinyLlama"""
+        """Generate response using TinyLlama with separated system message"""
         # Get context and format prompt
-        context, _ = self.generate_response_with_context(question, style_predictions)
+        context, question_type = self.generate_response_with_context(question, style_predictions)
         
-        # Format prompt for TinyLlama
-        prompt = f"""<|system|>
-        You are an art history expert. Provide a concise, accurate response.
-
-        <|user|>
+        # Separate system message
+        system_message = """<|system|>
+        You are an art history expert. Your primary role is to classify and explain artistic styles, not to identify specific artworks.
+        Never make definitive claims about specific artworks or their creators.
+        When discussing artwork, always use phrases like "appears to be in the style of" or "shows characteristics of".
+        Focus on describing the style, its characteristics, and notable artists of the movement."""
+        
+        # User prompt with question-specific guidance
+        user_prompt = f"""<|user|>
+        When discussing this artwork:
+        - Describe the style and its characteristics
+        - Mention representative artists of this style
+        - Avoid identifying specific artworks
+        - Use "appears to be" rather than definitive statements
+        
         Context: {context}
         Question: {question}
 
         <|assistant|>"""
         
+        # Combine messages
+        full_prompt = f"{system_message}\n{user_prompt}"
+        
+        # Debug: Print token count for monitoring
+        token_count = len(self.tokenizer.encode(full_prompt))
+        print(f"Prompt token count: {token_count}")
+        
         # Tokenize with proper handling
         inputs = self.tokenizer(
-            prompt,
+            full_prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=200
+            max_length=512
         )
         
         # Generate response
         with torch.inference_mode():
             outputs = self.llm.generate(
                 **inputs,
-                max_length=200,
-                temperature=0.3,
+                max_new_tokens=250,
+                temperature=0.45,
                 top_p=0.9,
                 do_sample=True,
-                repetition_penalty=1.1,
+                repetition_penalty=1.2,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
             )
         
         # Decode and clean response
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        response = self._clean_response(response, prompt)
+        response = self._clean_response(response, user_prompt, system_message)
         
         return response
-    
 
 
