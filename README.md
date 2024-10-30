@@ -16,10 +16,10 @@ a real world scenario.
 - 🤖 Natural language interaction for art queries
 
 ### Components
-- **CNN Classifier**: 
-- **Language Model**: 
-- **Data Pipeline**: 
-- **Gradio Interface**:
+- **CNN Classifier**
+- **Language Model**
+- **Data Pipeline**
+- **Gradio Interface**
 
 ## 🚀 Development Roadmap
 
@@ -320,59 +320,59 @@ CUDA-capable GPU (recommended)
 
 Required Python packages:
 
-TensorFlow 2.x
-Keras
-Gradio
-NumPy
-Pandas
-Pillow (PIL)
-scikit-learn
-transformers
-matplotlib
-seaborn
-plotly
-tqdm
-python-dotenv
-ratelimit
-requests
+- TensorFlow 2.x
+- Keras
+- Gradio
+- NumPy
+- Pandas
+- Pillow (PIL)
+- scikit-learn
+- transformers
+- matplotlib
+- seaborn
+- plotly
+- tqdm
+- python-dotenv
+- ratelimit
+- requests
 
-Installation
-Clone the repository and install dependencies:
+🔧 Installation
+
+
 ```bash
-# Clone the repository
-git clone [your-repo-url]
-cd art-classifier
+Clone the repository
+git clone https://github.com/piiop/final_project.git
+cd final_project
 
 # Install dependencies
 pip install -r requirements.txt
 
+💻 Usage
 
-## 💻 Usage
-```python
-# Add code snippets demonstrating basic usage
-from art_classifier import ArtClassifier
+Basic usage example:
+pythonCopyfrom ArtClassifier import ArtClassifier
 
 classifier = ArtClassifier()
 prediction = classifier.analyze("path_to_image.jpg")
 ```
 
-💻 Usage
-Web Interface
-A live demo is available at [Add Gradio demo URL]
+💻 Gradio Interface
+
+A live demo is available: run Gradio 'To create a public link, set `share=True` in `launch()`'
 
 Note: This demo will be active for 72 hours from deployment
 
-Local Deployment
-bashCopy# Start the Gradio interface locally
-python app.py
-The interface will be available at http://localhost:7860
+Start the Gradio interface locally
+
 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
 🙏 Acknowledgments
 
 WikiArt and Art Institute of Chicago for providing the training data
 TinyLlama team for the language model
-[Your Institution/Bootcamp] for project support
+OSU Bootcamp for project support
+
+
 Inspired by:
 
 Style Classification and Artist Classification using CNN
@@ -382,6 +382,6 @@ Art Style Transfer Using CNN
 
 
 📬 Contact
-[Your Name] - [Your GitHub Profile URL]
+Michael Leston - [[GitHub Profile URL](https://github.com/piiop)]
 ---
 *Project developed as part of [Your Course/Institution]*
