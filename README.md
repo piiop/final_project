@@ -16,10 +16,10 @@ a real world scenario.
 - 🤖 Natural language interaction for art queries
 
 ### Components
-- **CNN Classifier**
-- **Language Model**
-- **Data Pipeline**
-- **Gradio Interface**
+- [CNN Classifier](#cnn-classifier)
+- [Language Model](#language-model)
+- [Data Pipeline](#data-pipeline)
+- [Gradio Interface](#gradio-interface)
 
 ## 🚀 Development Roadmap
 
@@ -61,9 +61,9 @@ Developed artist-based collection strategy:
 - Final processed dataset: 15,600 images after augmentation
 
 ### Dataset Distribution
-[Insert your visualization of the classes here]
+![Visualization of Data Distribution](./visualizations/curated_original.png)
 
-## Data Processing Pipeline
+## Data Pipeline
 
 ### 1. Dataset Curation
 
@@ -127,11 +127,11 @@ Applied conservative augmentation techniques to preserve artistic style characte
  - Initial collection: 9,114 images
  - Augmented to achieve class balance
 
-[Insert visualization of final class distribution after processing]
+![Visualization of Data Distribution](./visualizations/piechart_augmented_curated.png)
 
-## 🛠️ Technical Architecture
+## CNN Classifier
 
-### Data Pipeline
+### Data Pipeline 🛠️ 
 
 #### Data Loading
 - Images loaded from Google Drive to Colab runtime
@@ -211,12 +211,10 @@ Considered successful given:
 - Minimal validation improvements between epochs 30-40
 - Training accuracy continued to climb while validation plateaued
 
-[Insert Training History Graph showing:
-- Training vs Validation Accuracy
-- Training vs Validation Loss]
+![Visualization of Training Graph](./visualizations/training_graphs/CNN_curated_final.png)
 
 ### Per-Class Performance
-[Insert confusion matrix or per-class accuracy visualization]
+![Visualization of Per Class Accuracy](./visualizations/training_graphs/accuracy_graph.png)
 
 ### Challenges and Considerations
 
@@ -232,9 +230,9 @@ Considered successful given:
 - Regularization techniques helped but didn't eliminate overfitting
 - Balance between model capacity and generalization
 
-## 🤖 Natural Language Integration
+##  Language Model
 
-### Model Selection & Architecture
+### Model Selection & Architecture 🤖
 
 Selected TinyLlama-1.1B-Chat for balanced performance:
 - Manageable model size
@@ -280,7 +278,7 @@ Selected TinyLlama-1.1B-Chat for balanced performance:
 
 ## 💻 Web Interface Implementation
 
-### Gradio Interface Components
+### Gradio Interface
 
 #### Input Components
 - Image upload (supports jpg, png, webp)
@@ -312,7 +310,24 @@ Selected TinyLlama-1.1B-Chat for balanced performance:
 - Markdown-formatted instructions
 - Responsive design
 
+### Model Testing
+The model was tested using images located in the following directory:
+```bash
+./visualizations/dalle3_images_jpg
 🔧 Installation and Setup
+
+### Test Examples
+```
+
+![Pop Art Test Example](./visualizations/dalle3_images_jpg/popart.jpg)
+*Example of Pop Art style test image*
+
+![Minimalist Test Example](./visualizations/dalle3_images_jpg/minimalist.jpg)
+*Example of Minimalist style test image*
+
+
+### Installation/Usage
+
 Prerequisites
 
 Python 3.8+
@@ -366,22 +381,15 @@ Start the Gradio interface locally
 
 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
-🙏 Acknowledgments
 
-WikiArt and Art Institute of Chicago for providing the training data
-TinyLlama team for the language model
-OSU Bootcamp for project support
+### 🙏 Acknowledgments
 
-
-Inspired by:
-
-Style Classification and Artist Classification using CNN
-Recognizing Art Style Automatically
-Art Style Transfer Using CNN
+- WikiArt and Art Institute of Chicago for providing the training data
+- TinyLlama team for the language model
+- OSU/edX Bootcamp for project support
 
 
-
-📬 Contact
+### 📬 Contact
 Michael Leston - [[GitHub Profile URL](https://github.com/piiop)]
 ---
-*Project developed as part of [Your Course/Institution]*
+*Project developed as part of OSU/edX Bootcamp*
